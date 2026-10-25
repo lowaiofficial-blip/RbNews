@@ -3,7 +3,9 @@ import http from 'http';
 
 const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const REDIS_URL = process.env.REDIS_URL;
-const RSS_URL = 'https://blog.roblox.com/feed/';
+
+// RSS Kaynağını güncelledik (Roblox Blog artık RSS sunmuyor)
+const RSS_URL = 'https://tryhardguides.com/tag/roblox/feed/';
 const PORT = process.env.PORT || 3000;
 
 // Redis Bağlantısı
@@ -51,17 +53,22 @@ async function checkNews() {
   try {
     const rssRes = await fetch(RSS_URL);
     const xml = await rssRes.text();
-    const items = parseRSS(xml).slice(0, 5);
+    
+    // Son 3 haberi al (spam olmaması için)
+    const items = parseRSS(xml).slice(0, 3);
 
     let sent = 0;
     for (const item of items) {
       if (!item.link) continue;
       const key = `sent:${item.link}`;
       const already = await redis.get(key);
+      
+      // Eğer bu haber daha önce gönderildiyse atla
       if (already) continue;
       
       await sendToDiscord(item);
-      await redis.set(key, '1', 'EX', 60 * 60 * 24 * 30); // 30 gün boyunca hatırla
+      // Gönderilen haberi 30 gün boyunca Redis'te tut
+      await redis.set(key, '1', 'EX', 60 * 60 * 24 * 30); 
       sent++;
     }
     console.log(`[${new Date().toISOString()}] Kontrol edildi. Gönderilen: ${sent}`);
